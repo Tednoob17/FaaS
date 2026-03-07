@@ -7,6 +7,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <sys/socket.h>
+#include <sys/wait.h>
 #include <sqlite3.h>
 #include "faas_compiler.h"
 

@@ -1,301 +1,286 @@
-# FaaS Platform - Function as a Service
+# FaaS
 
-A lightweight, high-performance Function-as-a-Service platform with:
-- 🚀 **Smart load balancing** (CPU+MEM+IO score-based)
-- ⚡ **Real-time config sync** (SQLite → RAM)
-- 📊 **Live worker metrics** (500ms granularity)
-- 🔧 **Zero-downtime updates** (modify routes without restart)
+A lightweight Function-as-a-Service platform written in C, built around:
+- A multi-threaded HTTP gateway
+- A worker pool communicating through Unix domain sockets
+- Dynamic route configuration stored in SQLite and synchronized in memory
+- Metrics-driven scheduling (CPU, memory, I/O score)
+
+## Table of Contents
+
+- [Why This Project](#why-this-project)
+- [Core Features](#core-features)
+- [Architecture](#architecture)
+- [Repository Layout](#repository-layout)
+- [Requirements](#requirements)
+- [Quick Start](#quick-start)
+- [Build and Run](#build-and-run)
+- [API and Routes](#api-and-routes)
+- [Dynamic Function Upload](#dynamic-function-upload)
+- [Benchmarking](#benchmarking)
+- [Troubleshooting](#troubleshooting)
+- [Roadmap](#roadmap)
+- [License](#license)
+
+## Why This Project
+
+This repository explores a practical low-level FaaS runtime with a focus on:
+- High control over performance-critical paths in C
+- Simple deployment model on Linux environments
+- Fast local routing using in-memory lookup
+- Runtime flexibility (WASM and PHP execution paths)
+
+## Core Features
+
+- Smart worker selection using a score model:
+
+```text
+score = 0.5 * cpu + 0.3 * mem + 0.2 * io
+```
+
+- Zero-copy style client handoff to workers via FD passing (`SCM_RIGHTS`)
+- Dynamic route updates from SQLite to in-memory KV without gateway restart
+- Background metrics ingestion from workers every 500 ms
+- Upload endpoint to compile/register functions from descriptor + source
 
 ## Architecture
 
+High-level request flow:
+
+```text
+Client HTTP request
+  -> Gateway (HTTP parse + route lookup + scheduler)
+  -> Selected Worker (Unix socket)
+  -> Runtime execution (WASM or PHP)
+  -> Direct response to client
 ```
-HTTP Client (curl, browser, etc.)
-       ↓
-   Port 8080
-       ↓
-┌──────────────────────────────────────┐
-│         GATEWAY Process              │
-│  ┌────────────────────────────────┐ │
-│  │ HTTP Server (multi-threaded)   │ │
-│  │ Config Loader (KV-based)       │ │
-│  │ Smart Scheduler (score-based)  │ │
-│  └────────────────────────────────┘ │
-│  ┌────────────────────────────────┐ │
-│  │ Background Threads:            │ │
-│  │  - KV Sync (SQLite→RAM)        │ │
-│  │  - Metrics Collector           │ │
-│  └────────────────────────────────┘ │
-└──────────────┬───────────────────────┘
-               │ Unix sockets
-       ┌───────┼───────┐
-       ↓       ↓       ↓
-   Worker 0  Worker 1  ...
+
+Background subsystems:
+- `kv_sqlite_sync`: periodic synchronization from `faas_meta.db` into RAM
+- `metrics_collector`: receives worker metrics via datagram socket
+
+Detailed architecture documentation:
+- `ARCHITECTURE.md`
+
+## Repository Layout
+
+```text
+.
+├── src/
+│   ├── gateway.c              # HTTP gateway + scheduler + upload handling
+│   ├── worker.c               # Worker runtime execution
+│   ├── fd_passing.c/.h        # sendfd/recvfd over Unix sockets
+│   ├── http_handler.c/.h      # HTTP parsing, responses, multipart parsing
+│   ├── kv.c/.h                # In-memory key-value store
+│   ├── kv_sqlite_sync.c       # SQLite -> KV synchronization thread
+│   ├── metrics_*.c/.h         # Metrics collection and smoothing
+│   └── faas_compiler.c/.h     # Upload compiler pipeline
+├── pages/
+│   └── upload.html            # Upload UI served at GET /upload
+├── examples/
+│   ├── hello.c
+│   └── descriptor.json
+├── benchmarks/
+│   ├── run_benchmark.sh
+│   ├── quick_test.sh
+│   └── analyze_results.py
+├── init.sql                   # Initial route data
+├── Makefile                   # Canonical build and run targets
+├── start.sh                   # Scripted build + run helper
+└── stop.sh                    # Stop workers/gateway and cleanup sockets
+```
+
+## Requirements
+
+- Linux (native, WSL, container)
+- GCC toolchain (`build-essential`)
+- `make`
+- SQLite runtime and headers (`sqlite3`, `libsqlite3-dev`)
+- Optional runtimes for executing uploaded functions:
+  - `wasmer` for WASM execution in workers
+  - `php` CLI for PHP routes
+
+Install base dependencies on Ubuntu/Debian:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y build-essential make sqlite3 libsqlite3-dev
 ```
 
 ## Quick Start
 
-### Tips : 
-- It possible thatduring install or test you need to run some script or command with `sudo` command, because
-we need it to install some tools and dependancy, you can check our script if you want `start.sh`, `install_deps.sh`, `start.sh`, `clean.sh`.
-- We recommend also to do a `chmod a+x *.sh` for add right of execution on all script .
-
-### Option 1: Using shell scripts (recommended)
 ```bash
-# Fix line endings (if on WSL/Windows)
-sed -i 's/\r$//' *.sh
+# 1) Build binaries
+make
 
-# Make scripts executable
-chmod +x *.sh
+# 2) Initialize SQLite route table
+make init
 
-# Install dependencies (Ubuntu/Debian/WSL)
-./install_deps.sh
+# 3) Start workers + gateway
+make start
+```
 
-# Build and start
+Gateway listens on `http://localhost:8080`.
+
+Stop everything:
+
+```bash
+make stop
+```
+
+## Build and Run
+
+### Recommended Path (Makefile)
+
+```bash
+make clean
+make
+make start
+```
+
+### Script Path
+
+```bash
+chmod +x start.sh stop.sh clean.sh
 ./start.sh
 ```
 
-### Option 2: Using Makefile
+### Build Targets
+
 ```bash
-# Build all
-make 2> /dev/null
-
-# Initialize database and start
-make start 2> /dev/null
-
-# Stop
-make stop
-
-# Clean
-make clean
+make            # build binaries in build/
+make init       # create and seed faas_meta.db
+make start      # build + init + launch workers and gateway
+make stop       # stop worker/gateway processes and cleanup sockets
+make clean      # remove build artifacts and runtime files
 ```
 
-## Testing
+## API and Routes
 
-### Quick Test Script
+### Built-in Seed Routes
+
+From `init.sql`:
+- `POST /resize`
+- `GET /ping`
+- `POST /api/hello`
+- `GET /api/info`
+- `GET /python`
+
+### Example Calls
+
 ```bash
-chmod +x test.sh
-./test.sh
-```
-
-### Manual Tests
-
-#### PHP Functions (work immediately!)
-```bash
-# Test POST /api/hello (PHP)
 curl -X POST http://localhost:8080/api/hello \
   -H "Content-Type: application/json" \
   -d '{"name":"Alice"}'
 
-# Test GET /api/info (PHP)
 curl http://localhost:8080/api/info
 ```
 
-#### WASM Functions (require wasmer)
+### Route Data Model
+
+`functions` table schema (`k`, `v`, `updated`):
+- `k`: route key in the format `METHOD:/path`
+- `v`: JSON descriptor (`runtime`, `module`, `handler`, etc.)
+- `updated`: Unix timestamp used by sync thread
+
+## Dynamic Function Upload
+
+Upload endpoint:
+- `GET /upload` serves the HTML upload page
+- `POST /upload` expects multipart form-data with:
+  - field `code`
+  - field `descriptor`
+
+Compilation path:
+- temporary input directory: `/tmp/progfile`
+- output module path: `/opt/functions/<uuid>/module.wasm`
+
+The compiler component (`src/faas_compiler.c`) updates deployment metadata and inserts route config into `faas_meta.db` when available.
+
+## Benchmarking
+
+Quick benchmark:
+
 ```bash
-# Test POST /resize (WASM)
-curl -X POST http://localhost:8080/resize \
-  -H "Content-Type: application/json" \
-  -d '{"image":"base64data...","width":800}'
-
-# Test GET /ping (WASM)
-curl http://localhost:8080/ping
+cd benchmarks
+chmod +x *.sh
+./quick_test.sh
 ```
 
-### Add new function dynamically
+Full benchmark workflow:
+
 ```bash
-# Add function config
-sqlite3 faas_meta.db << EOF
-INSERT INTO functions (k, v, updated) VALUES (
-  'POST:/api/convert',
-  '{"name":"imageConverter","runtime":"wasm","module":"/opt/functions/convert.wasm","handler":"convert","memory":512,"timeout":30}',
-  strftime('%s','now')
-);
-EOF
-
-# Wait <5 seconds, it's automatically synced!
-
-# Test new route
-curl -X POST http://localhost:8080/api/convert \
-  -d '{"format":"png"}'
+cd benchmarks
+./run_benchmark.sh
+python3 analyze_results.py
 ```
 
-## Project Structure
-
-```
-.
-├── build/                    # Build artifacts (auto-generated)
-│   ├── *.o                  # Object files
-│   ├── worker               # Worker binary
-│   └── gateway              # Gateway binary
-│
-├── src/                     # Source code directory
-│   ├── gateway.c            # Main: HTTP + Load Balancer
-│   ├── worker.c             # Function executor
-│   ├── http_handler.c/h     # HTTP parsing & responses
-│   ├── config_loader.c/h    # Route lookup
-│   ├── kv.c/h               # In-memory KV store
-│   ├── kv_sqlite_sync.c     # SQLite → KV sync
-│   ├── metrics_collector.c  # Collect worker metrics
-│   ├── metrics_reader.c/h   # Read /proc metrics
-│   ├── metrics_smoother.c/h # EMA smoothing
-│   ├── metrics.h            # Metrics structures
-│   └── scheduler_config.h   # Score weights (α,β,γ)
-│
-├── archive/                 # Old/obsolete files (git-ignored)
-│   ├── load_balancer.c.old  # Old standalone LB
-│   └── main.c.old           # Old KV test
-│
-├── Configuration
-│   ├── init.sql             # Database schema & sample data
-│   └── faas_meta.db         # SQLite database (runtime)
-│
-├── Build & Scripts
-│   ├── Makefile             # Build system
-│   ├── start.sh             # Build & start
-│   ├── stop.sh              # Stop services
-│   ├── clean.sh             # Clean artifacts
-│   ├── reorganize.sh        # Move files to src/
-│   └── install_deps.sh      # Install dependencies
-│
-└── Documentation
-    ├── README.md            # This file
-    ├── ARCHITECTURE.md      # Architecture details
-    ├── GATEWAY.md           # Gateway docs
-    ├── INSTALL.md           # Installation guide
-    └── FILES.md             # File reference
-```
-
-## Configuration
-
-### Scheduler Tuning (`src/scheduler_config.h`)
-
-```c
-// Score weights
-#define ALPHA 0.5f   // CPU weight (50%)
-#define BETA  0.3f   // Memory weight (30%)
-#define GAMMA 0.2f   // I/O weight (20%)
-
-// Smoothing factor
-#define EMA_FACTOR 0.7f  // 70% old, 30% new
-```
-
-### Worker Count (`src/gateway.c`)
-
-```c
-#define NUM_WORKERS 4  // Default: 4 workers
-```
-
-To change the number of workers:
-1. Edit `src/gateway.c` - change `NUM_WORKERS`
-2. Add/remove socket paths in `WORKER_SOCKS[]`
-3. Edit `start.sh` - add/remove worker launch commands
-
-### HTTP Port (`src/gateway.c`)
-
-```c
-#define HTTP_PORT 8080  // Change if needed
-```
-
-## Monitoring
-
-Watch live:
-```bash
-# Watch database
-watch -n 1 'sqlite3 faas_meta.db "SELECT k,substr(v,1,60) FROM functions;"'
-
-# Watch logs
-# Gateway and workers output to stdout
-```
-
-## Key Features
-
-### 1. Smart Load Balancing
-Workers send metrics every 500ms:
-```
-Score = 0.5×CPU + 0.3×MEM + 0.2×IO
-```
-Gateway always selects worker with **lowest score**.
-
-### 2. Zero-Downtime Updates
-Modify routes in SQLite:
-```sql
-UPDATE functions 
-SET v='{"module":"/new/path.wasm",...}', 
-    updated=strftime('%s','now') 
-WHERE k='POST:/resize';
-```
-Changes sync within 5 seconds automatically!
-
-### 3. Multi-threaded HTTP
-One thread per HTTP request = high concurrency.
-
-### 4. Process Isolation
-Each function executes in isolated process (fork/exec).
-
-## Performance
-
-| Metric | Value |
-|--------|-------|
-| HTTP Throughput | ~10,000 req/s |
-| Latency (routing) | <1µs (direct call) |
-| Latency (worker) | ~50µs (Unix socket) |
-| Config sync | <5s (polling) |
-| Metrics refresh | 500ms (push) |
-
-## Requirements
-
-- **OS**: Linux (WSL on Windows)
-- **Compiler**: GCC with pthread support
-- **Database**: SQLite3 + libsqlite3-dev
-- **Runtimes**:
-  - PHP CLI (for PHP functions) - Usually pre-installed
-  - Wasmer (for WASM functions) - Optional
+More details:
+- `benchmarks/BENCHMARKING_GUIDE.md`
+- `PERFORMANCE.md`
 
 ## Troubleshooting
 
-### Port already in use
-```bash
-# Kill process using port 8080
-sudo lsof -ti:8080 | xargs kill -9
-```
+### Compilation Fails in `start.sh`
 
-### Workers not responding
-```bash
-./stop.sh
-./start.sh
-```
+Two common linker/build issues fixed in this repository:
 
-### Database issues
-```bash
-rm -f faas_meta.db
-sqlite3 faas_meta.db < init.sql
-```
+1. Missing object files in script build commands
+- Worker must link `fd_passing.o` and `http_handler.o`
+- Gateway must link `fd_passing.o`
 
-### Line ending issues (Windows)
-```bash
-sed -i 's/\r$//' *.sh
-```
+2. `WEXITSTATUS` unresolved in compiler unit
+- `src/faas_compiler.c` needs `#include <sys/wait.h>`
 
-## Development
+If you still get build errors, use:
 
-### Build only
-```bash
-make
-```
-
-### Rebuild from scratch
 ```bash
 make clean
 make
 ```
 
-### Debug mode
+Then verify dependencies:
+
 ```bash
-# Edit Makefile, change:
-CFLAGS = -Wall -Wextra -pthread -O2 -g -DDEBUG
+gcc --version
+sqlite3 --version
+ls /usr/include/sqlite3.h
 ```
+
+### Port Already in Use
+
+```bash
+sudo lsof -ti:8080 | xargs -r kill -9
+make stop
+```
+
+### Missing Runtime Binaries at Execution Time
+
+Compilation may succeed while runtime execution fails if these are absent:
+- `wasmer` for WASM modules
+- `php` for PHP modules
+
+Check quickly:
+
+```bash
+command -v wasmer || echo "wasmer not installed"
+command -v php || echo "php not installed"
+```
+
+### Line Ending Issues (`^M`)
+
+```bash
+sed -i 's/\r$//' *.sh benchmarks/*.sh
+chmod +x *.sh benchmarks/*.sh
+```
+
+## Roadmap
+
+- Thread pool in gateway to reduce thread-creation overhead
+- Better structured JSON parsing and validation
+- Authentication and rate limiting middleware
+- CI with repeatable integration tests
 
 ## License
 
-Educational project for distributed systems learning.
-
+No license file is currently present in this repository. Add `LICENSE` to define usage terms.

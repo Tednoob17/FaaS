@@ -48,19 +48,20 @@ echo "[BUILD] Compiling workers with real metrics and smart scheduling..."
 gcc -c -o build/worker.o src/worker.c -Isrc -lpthread
 gcc -c -o build/metrics_reader.o src/metrics_reader.c -Isrc
 gcc -c -o build/metrics_smoother.o src/metrics_smoother.c -Isrc
-gcc -o build/worker build/worker.o build/metrics_reader.o build/metrics_smoother.o -lpthread
+gcc -c -o build/fd_passing.o src/fd_passing.c -Isrc
+gcc -c -o build/http_handler.o src/http_handler.c -Isrc
+gcc -o build/worker build/worker.o build/metrics_reader.o build/metrics_smoother.o build/fd_passing.o build/http_handler.o -lpthread
 
 echo "[BUILD] Compiling FaaS compiler library..."
 gcc -c -o build/faas_compiler.o src/faas_compiler.c -Isrc -I.
 
 echo "[BUILD] Compiling unified gateway (HTTP + Load Balancer + Compiler)..."
 gcc -c -o build/gateway.o src/gateway.c -Isrc -I. -lpthread
-gcc -c -o build/http_handler.o src/http_handler.c -Isrc
 gcc -c -o build/config_loader.o src/config_loader.c -Isrc
 gcc -c -o build/kv.o src/kv.c -Isrc
 gcc -c -o build/kv_sqlite_sync.o src/kv_sqlite_sync.c -Isrc
 gcc -c -o build/metrics_collector.o src/metrics_collector.c -Isrc
-gcc -o build/gateway build/gateway.o build/http_handler.o build/config_loader.o build/kv.o build/kv_sqlite_sync.o build/metrics_collector.o build/faas_compiler.o -lsqlite3 -lpthread
+gcc -o build/gateway build/gateway.o build/http_handler.o build/config_loader.o build/kv.o build/kv_sqlite_sync.o build/metrics_collector.o build/fd_passing.o build/faas_compiler.o -lsqlite3 -lpthread
 
 echo "[BUILD] ✓ Compilation successful"
 echo "[BUILD] Binaries in: build/"
