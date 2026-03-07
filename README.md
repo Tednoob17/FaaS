@@ -27,6 +27,7 @@ A lightweight Function-as-a-Service platform written in C, built around:
 - [Requirements](#requirements)
 - [Quick Start](#quick-start)
 - [Build and Run](#build-and-run)
+- [Runtime Matrix](#runtime-matrix)
 - [API and Routes](#api-and-routes)
 - [Dynamic Function Upload](#dynamic-function-upload)
 - [Benchmarking](#benchmarking)
@@ -63,7 +64,7 @@ High-level request flow:
 Client HTTP request
   -> Gateway (HTTP parse + route lookup + scheduler)
   -> Selected Worker (Unix socket)
-  -> Runtime execution (WASM or PHP)
+  -> Runtime execution (PHP, WASM, or native binary)
   -> Direct response to client
 ```
 
@@ -108,15 +109,24 @@ Detailed architecture documentation:
 - GCC toolchain (`build-essential`)
 - `make`
 - SQLite runtime and headers (`sqlite3`, `libsqlite3-dev`)
-- Optional runtimes for executing uploaded functions:
-  - `wasmer` for WASM execution in workers
+- Runtime/toolchain requirements for executing uploaded functions:
   - `php` CLI for PHP routes
+  - `gcc` for C uploads (native binary build)
+  - `g++` for C++ uploads (native binary build)
+- Optional:
+  - `wasmer` for WASM execution in workers
 
 Install base dependencies on Ubuntu/Debian:
 
 ```bash
 sudo apt-get update
 sudo apt-get install -y build-essential make sqlite3 libsqlite3-dev
+```
+
+Also recommended for upload workflows:
+
+```bash
+sudo apt-get install -y php-cli
 ```
 
 ## Quick Start
@@ -133,6 +143,10 @@ make start
 ```
 
 Gateway listens on `http://localhost:8080`.
+
+Web UI is available at:
+- `http://localhost:8080/`
+- `http://localhost:8080/upload`
 
 Stop everything:
 
@@ -167,6 +181,16 @@ make stop       # stop worker/gateway processes and cleanup sockets
 make clean      # remove build artifacts and runtime files
 ```
 
+## Runtime Matrix
+
+| Descriptor Runtime | Build Output | Worker Execution Path | Required Tools |
+|---|---|---|---|
+| `php` | source file | `php <file>` | `php` |
+| `wasm` | `.wasm` module | `wasmer run <module>` | `wasmer` |
+| `c` | native binary (`module.bin`) | direct `exec` | `gcc` |
+| `cpp` / `c++` | native binary (`module.bin`) | direct `exec` | `g++` |
+| `rust`, `go`, `tinygo`, `python` | toolchain-dependent | currently mapped to wasm flow | corresponding toolchain |
+
 ## API and Routes
 
 ### Built-in Seed Routes
@@ -198,16 +222,29 @@ curl http://localhost:8080/api/info
 ## Dynamic Function Upload
 
 Upload endpoint:
-- `GET /upload` serves the HTML upload page
+- `GET /` and `GET /upload` serve the HTML upload page
 - `POST /upload` expects multipart form-data with:
   - field `code`
   - field `descriptor`
 
 Compilation path:
 - temporary input directory: `/tmp/progfile`
-- output module path: `/opt/functions/<uuid>/module.wasm`
+- output path:
+  - `/opt/functions/<uuid>/module.bin` for `c`/`cpp`
+  - `/opt/functions/<uuid>/module.wasm` for wasm pipeline
 
 The compiler component (`src/faas_compiler.c`) updates deployment metadata and inserts route config into `faas_meta.db` when available.
+
+Example upload test with repository files:
+
+1. In the UI, upload:
+- `examples/hello.c`
+- `examples/descriptor.json`
+2. After success, call returned route like:
+
+```bash
+curl -X POST http://localhost:8080/api/<generated-id> -d '{"name":"Alice"}'
+```
 
 ## Benchmarking
 
@@ -266,6 +303,20 @@ sudo lsof -ti:8080 | xargs -r kill -9
 make stop
 ```
 
+### `make start` exits with code `2`
+
+This usually means startup failed early (port conflict, missing dependency, or stale state).
+
+Use this clean recovery sequence:
+
+```bash
+make stop
+make clean
+make
+make init
+XDEBUG_MODE=off make start
+```
+
 ### Runtime Execution Errors (`exit_code:127` or missing module file)
 
 If you see errors like:
@@ -281,6 +332,17 @@ make start
 ```
 
 The default seeded routes now use `examples/*.php` for immediate local testing.
+
+### Xdebug noise appears in HTTP JSON responses
+
+If PHP prints lines like:
+`Xdebug: [Step Debug] Could not connect to debugging client...`
+
+Run gateway with Xdebug disabled:
+
+```bash
+XDEBUG_MODE=off make start
+```
 
 ### Missing Runtime Binaries at Execution Time
 

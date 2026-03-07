@@ -235,16 +235,21 @@ int compile_function(const char* uuid) {
         return 5;
     }
 
-    char out_module[2048];  // Larger buffer to avoid truncation warning
+    char out_module[2048];  // Output artifact path
+    const char* deployed_runtime = "wasm";
     snprintf(out_module, sizeof(out_module), "%s/module.wasm", out_dir);
 
     // choose compile command
     char cmd[4096];
     int supported = 1;
-	if (strcmp(runtime, "c") == 0) {
-    	snprintf(cmd, sizeof(cmd), "emcc -O2 %s -o %s --no-entry -s STANDALONE_WASM", code_path, out_module);
-	} else if (strcmp(runtime, "cpp") == 0 || strcmp(runtime, "c++") == 0) {
-    	snprintf(cmd, sizeof(cmd), "em++ -O2 %s -o %s --no-entry -s STANDALONE_WASM", code_path, out_module);
+    if (strcmp(runtime, "c") == 0) {
+        deployed_runtime = "native";
+        snprintf(out_module, sizeof(out_module), "%s/module.bin", out_dir);
+        snprintf(cmd, sizeof(cmd), "gcc -O2 %s -o %s", code_path, out_module);
+    } else if (strcmp(runtime, "cpp") == 0 || strcmp(runtime, "c++") == 0) {
+        deployed_runtime = "native";
+        snprintf(out_module, sizeof(out_module), "%s/module.bin", out_dir);
+        snprintf(cmd, sizeof(cmd), "g++ -O2 %s -o %s", code_path, out_module);
 	} else if (strcmp(runtime, "rust") == 0) {
     	snprintf(cmd, sizeof(cmd), "rustc +stable --target=wasm32-wasi -O -o %s %s", out_module, code_path);
 	} else if (strcmp(runtime, "tinygo") == 0 || strcmp(runtime, "go") == 0) {
@@ -290,7 +295,7 @@ int compile_function(const char* uuid) {
 
     // produce DB JSON (keep original runtime for reference)
     char dbjson[2048];
-    snprintf(dbjson, sizeof(dbjson), "{\"name\":\"%s\",\"runtime\":\"wasm\",\"module\":\"%s\",\"handler\":\"%s\",\"memory\":128,\"timeout\":5}", uuid, out_module, uuid);
+    snprintf(dbjson, sizeof(dbjson), "{\"name\":\"%s\",\"runtime\":\"%s\",\"module\":\"%s\",\"handler\":\"%s\",\"memory\":128,\"timeout\":5}", uuid, deployed_runtime, out_module, uuid);
 
     FILE *dbf = fopen(db_path, "w");
     if (dbf) {

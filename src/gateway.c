@@ -307,8 +307,9 @@ void* handle_http_client(void* arg) {
     printf("[GATEWAY] HTTP %s %s (body: %zu bytes)\n", 
            req.method, req.uri, req.body_len);
     
-    // Special route: GET /upload returns HTML page from file
-    if (strcmp(req.method, "GET") == 0 && strcmp(req.uri, "/upload") == 0) {
+    // Special routes: GET / or /upload return the upload HTML page
+    if (strcmp(req.method, "GET") == 0 &&
+        (strcmp(req.uri, "/") == 0 || strcmp(req.uri, "/upload") == 0)) {
         serve_html_file(client_fd, "upload.html");
         close(client_fd);
         return NULL;
