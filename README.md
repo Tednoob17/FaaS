@@ -1,5 +1,15 @@
 # FaaS
 
+[![Awesome](https://img.shields.io/badge/awesome-project-22c55e)](#faas)
+[![Language](https://img.shields.io/github/languages/top/Tednoob17/FaaS)](https://github.com/Tednoob17/FaaS)
+[![Repo Size](https://img.shields.io/github/repo-size/Tednoob17/FaaS)](https://github.com/Tednoob17/FaaS)
+[![Last Commit](https://img.shields.io/github/last-commit/Tednoob17/FaaS)](https://github.com/Tednoob17/FaaS/commits/master)
+[![Stars](https://img.shields.io/github/stars/Tednoob17/FaaS?style=social)](https://github.com/Tednoob17/FaaS/stargazers)
+[![Forks](https://img.shields.io/github/forks/Tednoob17/FaaS?style=social)](https://github.com/Tednoob17/FaaS/network/members)
+[![Issues](https://img.shields.io/github/issues/Tednoob17/FaaS)](https://github.com/Tednoob17/FaaS/issues)
+[![Platform](https://img.shields.io/badge/platform-linux-0ea5e9)](#requirements)
+
+
 A lightweight Function-as-a-Service platform written in C, built around:
 - A multi-threaded HTTP gateway
 - A worker pool communicating through Unix domain sockets
