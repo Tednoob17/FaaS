@@ -17,14 +17,14 @@ CREATE INDEX IF NOT EXISTS idx_functions_updated ON functions(updated);
 INSERT OR REPLACE INTO functions (k, v, updated)
 VALUES (
   'POST:/resize',
-  '{"name":"resizeImage","runtime":"wasm","module":"/opt/functions/resizeImage/module.wasm","handler":"resize_handler","memory":256,"timeout":10}',
+  '{"name":"resizeImage","runtime":"php","module":"examples/resize.php","handler":"main","memory":128,"timeout":10}',
   strftime('%s','now')
 );
 
 INSERT OR REPLACE INTO functions (k, v, updated)
 VALUES (
   'GET:/ping',
-  '{"name":"ping","runtime":"wasm","module":"/opt/functions/ping/module.wasm","handler":"ping","memory":128,"timeout":5}',
+  '{"name":"ping","runtime":"php","module":"examples/ping.php","handler":"main","memory":64,"timeout":5}',
   strftime('%s','now')
 );
 
@@ -32,14 +32,14 @@ VALUES (
 INSERT OR REPLACE INTO functions (k, v, updated)
 VALUES (
   'POST:/api/hello',
-  '{"name":"helloPhp","runtime":"php","module":"/opt/functions/hello/hello.php","handler":"main","memory":64,"timeout":5}',
+  '{"name":"helloPhp","runtime":"php","module":"examples/hello.php","handler":"main","memory":64,"timeout":5}',
   strftime('%s','now')
 );
 
 INSERT OR REPLACE INTO functions (k, v, updated)
 VALUES (
   'GET:/api/info',
-  '{"name":"phpInfo","runtime":"php","module":"/opt/functions/info/info.php","handler":"main","memory":64,"timeout":5}',
+  '{"name":"phpInfo","runtime":"php","module":"examples/info.php","handler":"main","memory":64,"timeout":5}',
   strftime('%s','now')
 );
 

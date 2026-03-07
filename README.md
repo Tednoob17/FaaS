@@ -172,11 +172,11 @@ make clean      # remove build artifacts and runtime files
 ### Built-in Seed Routes
 
 From `init.sql`:
-- `POST /resize`
-- `GET /ping`
-- `POST /api/hello`
-- `GET /api/info`
-- `GET /python`
+- `POST /resize` (PHP demo)
+- `GET /ping` (PHP demo)
+- `POST /api/hello` (PHP demo)
+- `GET /api/info` (PHP demo)
+- `GET /python` (WASM example, requires `wasmer` and module)
 
 ### Example Calls
 
@@ -265,6 +265,22 @@ ls /usr/include/sqlite3.h
 sudo lsof -ti:8080 | xargs -r kill -9
 make stop
 ```
+
+### Runtime Execution Errors (`exit_code:127` or missing module file)
+
+If you see errors like:
+- `execlp wasmer: No such file or directory`
+- `Could not open input file: /opt/functions/...`
+
+Recover with a full reseed + restart so routes point to the local demo files:
+
+```bash
+make stop
+make init
+make start
+```
+
+The default seeded routes now use `examples/*.php` for immediate local testing.
 
 ### Missing Runtime Binaries at Execution Time
 

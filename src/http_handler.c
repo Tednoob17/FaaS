@@ -167,14 +167,19 @@ void send_http_500(int client_fd, const char* error) {
     http_response_t resp = {0};
     resp.status_code = 500;
     strcpy(resp.content_type, "application/json");
-    
+
     if (error) {
-        snprintf(resp.body, sizeof(resp.body), "{\"error\":\"%s\"}", error);
+        // Preserve structured JSON error payloads, otherwise wrap plain text.
+        if (error[0] == '{' || error[0] == '[') {
+            strncpy(resp.body, error, sizeof(resp.body) - 1);
+        } else {
+            snprintf(resp.body, sizeof(resp.body), "{\"error\":\"%s\"}", error);
+        }
     } else {
         strcpy(resp.body, "{\"error\":\"Internal server error\"}");
     }
     resp.body_len = strlen(resp.body);
-    
+
     send_http_response(client_fd, &resp);
 }
 
