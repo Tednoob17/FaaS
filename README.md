@@ -10,6 +10,8 @@
 [![Platform](https://img.shields.io/badge/platform-linux-0ea5e9)](#requirements)
 
 
+> Replace `https://discord.gg/your-invite-code` with your real Discord invite.
+
 A lightweight Function-as-a-Service platform written in C, built around:
 - A multi-threaded HTTP gateway
 - A worker pool communicating through Unix domain sockets
