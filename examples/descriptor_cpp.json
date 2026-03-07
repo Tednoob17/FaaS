@@ -1,0 +1,6 @@
+{
+  "runtime": "cpp",
+  "method": "POST",
+  "memory": 128,
+  "timeout": 5
+}

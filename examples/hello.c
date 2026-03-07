@@ -1,7 +1,7 @@
 #include <stdio.h>
 
 int main() {
-    printf("Hello from uploaded C function!");
+    printf("{\"message\":\"Hello from uploaded C function\",\"runtime\":\"c\"}");
     return 0;
 }
 

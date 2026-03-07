@@ -9,8 +9,8 @@
 [![Issues](https://img.shields.io/github/issues/Tednoob17/FaaS)](https://github.com/Tednoob17/FaaS/issues)
 [![Platform](https://img.shields.io/badge/platform-linux-0ea5e9)](#requirements)
 
+![FaaS Platform](./faas.png)
 
-> Replace `https://discord.gg/your-invite-code` with your real Discord invite.
 
 A lightweight Function-as-a-Service platform written in C, built around:
 - A multi-threaded HTTP gateway
@@ -32,6 +32,7 @@ A lightweight Function-as-a-Service platform written in C, built around:
 - [Dynamic Function Upload](#dynamic-function-upload)
 - [Benchmarking](#benchmarking)
 - [Troubleshooting](#troubleshooting)
+- [Authors](#authors)
 - [Roadmap](#roadmap)
 - [License](#license)
 
@@ -364,6 +365,12 @@ sed -i 's/\r$//' *.sh benchmarks/*.sh
 chmod +x *.sh benchmarks/*.sh
 ```
 
+## Authors
+
+- [Tednoob17](https://github.com/Tednoob17)
+- [carmelAdk](https://github.com/carmelAdk)
+- [iamcherif](https://github.com/iamcherif)
+
 ## Roadmap
 
 - Thread pool in gateway to reduce thread-creation overhead
@@ -371,6 +378,3 @@ chmod +x *.sh benchmarks/*.sh
 - Authentication and rate limiting middleware
 - CI with repeatable integration tests
 
-## License
-
-No license file is currently present in this repository. Add `LICENSE` to define usage terms.

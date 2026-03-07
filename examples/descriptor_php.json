@@ -1,0 +1,6 @@
+{
+  "runtime": "php",
+  "method": "POST",
+  "memory": 64,
+  "timeout": 5
+}
