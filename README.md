@@ -12,8 +12,8 @@
 ![FaaS Platform](./faas.png)
 
 
-A lightweight Function-as-a-Service platform written in C, built around:
-- A multi-threaded HTTP gateway
+A lightweight Function-as-a-Service platform written in C, built around :
+- A multi-threaded HTTP gateway 
 - A worker pool communicating through Unix domain sockets
 - Dynamic route configuration stored in SQLite and synchronized in memory
 - Metrics-driven scheduling (CPU, memory, I/O score)
@@ -120,7 +120,7 @@ Detailed architecture documentation:
 Install base dependencies on Ubuntu/Debian:
 
 ```bash
-sudo apt-get update
+sudo apt-get update -y
 sudo apt-get install -y build-essential make sqlite3 libsqlite3-dev
 ```
 
